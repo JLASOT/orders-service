@@ -1,24 +1,4 @@
-# # Usa una imagen oficial de Node.js como base
-# FROM node:18
 
-# # Establece el directorio de trabajo dentro del contenedor
-# WORKDIR /app
-
-# # Copia los archivos de dependencias
-# COPY package*.json ./
-
-# # Instala las dependencias
-# RUN npm install
-
-# # Copia el resto del código fuente
-# COPY . .
-
-# # Expone el puerto que usa tu app (ajústalo si es diferente)
-# EXPOSE 3000
-
-# # Comando para iniciar la app
-# CMD ["node", "index.js"]
-# Etapa 1: build
 FROM node:18 AS build
 
 WORKDIR /app
