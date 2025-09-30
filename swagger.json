@@ -1,0 +1,266 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Servicio 2 - API de Productos y Órdenes",
+    "version": "1.0.0",
+    "description": "API para gestionar productos y órdenes en el servicio 2."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Productos",
+      "description": "Operaciones relacionadas con productos."
+    },
+    {
+      "name": "Órdenes",
+      "description": "Operaciones relacionadas con órdenes."
+    },
+    {
+      "name": "Clientes",
+      "description": "Operaciones relacionadas con Clientes."
+    }
+  ],
+  "paths": {
+    "/products": {
+      "get": {
+        "tags": ["Productos"],
+        "summary": "Listar productos",
+        "responses": {
+          "200": {
+            "description": "Lista de productos",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Productos"],
+        "summary": "Crear producto",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "price": { "type": "number" },
+                  "status": { "type": "integer" }
+                },
+                "required": ["name", "price"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Producto creado"
+          }
+        }
+      }
+    },
+    "/products/{id}": {
+      "get": {
+        "tags": ["Productos"],
+        "summary": "Obtener producto por ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Producto encontrado"
+          },
+          "404": {
+            "description": "Producto no encontrado"
+          }
+        }
+      }
+    },
+    "/orders": {
+      "get": {
+        "tags": ["Órdenes"],
+        "summary": "Listar órdenes",
+        "responses": {
+          "200": {
+            "description": "Lista de órdenes"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Órdenes"],
+        "summary": "Crear orden",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "customerId": { "type": "string" },
+                  "totalAmount": { "type": "number" },
+                  "products": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "productId": { "type": "string" },
+                        "quantity": { "type": "integer" }
+                      }
+                    }
+                  }
+                },
+                "required": ["customerId", "totalAmount", "products"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Orden creada"
+          }
+        }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "tags": ["Órdenes"],
+        "summary": "Obtener orden por ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orden encontrada"
+          },
+          "404": {
+            "description": "Orden no encontrada"
+          }
+        }
+      }
+    },
+
+    "/customers": {
+      "get": {
+        "tags": ["Clientes"],
+        "summary": "Listar clientes",
+        "responses": {
+          "200": {
+            "description": "Lista de clientes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "ci": { "type": "string" },
+                      "name": { "type": "string" },
+                      "last_name": { "type": "string" },
+                      "number": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      
+       "post": {
+      "tags": ["Clientes"],
+      "summary": "Crear un cliente",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "ci": { "type": "string" },
+                "name": { "type": "string" },
+                "last_name": { "type": "string" },
+                "number": { "type": "string" }
+              },
+              "required": ["ci", "name", "last_name"]
+            }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Cliente creado exitosamente",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "ci": { "type": "string" },
+                  "name": { "type": "string" },
+                  "last_name": { "type": "string" },
+                  "number": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Datos inválidos o faltantes"
+        }
+      }
+    }
+    },
+
+    "/customers/{id}": {
+      "get": {
+        "tags": ["Clientes"],
+        "summary": "Obtener cliente por ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "ci": { "type": "string" },
+                    "name": { "type": "string" },
+                    "last_name": { "type": "string" },
+                    "number": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Cliente no encontrado" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,93 @@
+
+image: node:22-bullseye
+
+stages:
+  - analysis
+  - test
+  - deploy
+
+variables:
+  DEPLOY_USER: ubuntu
+  DEPLOY_HOST: 13.222.59.250
+  APP_DIR: /home/ubuntu/service-orders
+
+  SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
+  GIT_DEPTH: "0"
+
+code_analysis_node:
+  stage: analysis
+  image: node:20
+  script:
+    - apt-get update -y && apt-get install -y jq
+    - npm ci
+
+    # Auditoría de seguridad
+    - echo "--- Audit Output ---" 
+    # - npm audit --json >> audit-report.txt || true
+
+    # Verificar vulnerabilidades HIGH o CRITICAL
+    - |
+      npm audit --json > audit.json || true
+      HIGH_COUNT=$(jq '.metadata.vulnerabilities.high' audit.json)
+      CRITICAL_COUNT=$(jq '.metadata.vulnerabilities.critical' audit.json)
+      echo "High: $HIGH_COUNT, Critical: $CRITICAL_COUNT"
+      if [ "$HIGH_COUNT" -gt 0 ] || [ "$CRITICAL_COUNT" -gt 0 ]; then
+        echo "🚨 Se encontraron vulnerabilidades críticas/altas"
+        exit 1
+      fi
+
+
+
+    # ESLint (análisis estático)
+    - echo "--- ESLint Output ---" > eslint-report.txt
+    - npx eslint . --ext .js,.ts >> eslint-report.txt || true
+
+  artifacts:
+    paths:
+      - audit.json
+      - eslint-report.txt
+      - prettier-report.txt
+    expire_in: 1 week
+
+sonarcloud_check:
+  stage: analysis
+  image:
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script:
+     - sonar-scanner -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=$SONAR_HOST_URL
+  only:
+    - main
+
+test:
+  image: node:20
+  stage: test
+  script:
+    - npm install
+    - npm run test
+  only:
+    - merge_requests
+    - main
+
+
+deploy_ec2:
+  stage: deploy
+  only:
+    - main
+  script:
+
+    - apt-get update -y && apt-get install -y openssh-client curl bash coreutils
+
+    - curl --silent "https://gitlab.com/gitlab-org/incubation-engineering/mobile-devops/download-secure-files/-/raw/main/installer" | bash
+
+    - test -f .secure_files/service-orders-key.pem && chmod 600 .secure_files/service-orders-key.pem
+
+    - ssh -o StrictHostKeyChecking=no -i .secure_files/service-orders-key.pem $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $APP_DIR"
+
+    - scp -o StrictHostKeyChecking=no -i .secure_files/service-orders-key.pem -r * $DEPLOY_USER@$DEPLOY_HOST:$APP_DIR
+
+    - ssh -o StrictHostKeyChecking=no -i .secure_files/service-orders-key.pem $DEPLOY_USER@$DEPLOY_HOST 'bash -s' < deploy.sh
