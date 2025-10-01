@@ -1,9 +1,8 @@
 pipeline {
-  agent { label 'vmubuntu' }
+  agent { label 'docker' }
 
   environment {
-    DOCKER_IMAGE_NAME = "orders-service/app:latest"
-    SSH_CREDENTIALS = "ssh-deploy-key"
+    DOCKER_IMAGE_NAME = "orders-service:latest"
     STAGING_URL = "http://localhost:3000"
   }
 
@@ -21,10 +20,6 @@ pipeline {
       }
     }
     
-    
-    
-    
-
     stage('SAST - Semgrep') {
       steps {
         echo "Running Semgrep (SAST)..."
@@ -101,14 +96,14 @@ stage('Docker Build & Trivy Scan') {
         archiveArtifacts artifacts: 'trivy-reports/**', allowEmptyArchive: true
       }
     }
-    
+
     stage('Deploy to Staging (docker-compose)') {
     //   agent { label 'docker' }
       steps {
         echo "Deploying to staging with docker-compose..."
         sh '''
-          docker compose -f docker-compose.yml down || true
-          docker compose -f docker-compose.yml up -d --build
+          docker-compose -f docker-compose.yml down || true
+          docker-compose -f docker-compose.yml up -d --build
           sleep 8
           docker ps -a
         '''
@@ -137,8 +132,30 @@ stage('DAST - OWASP ZAP scan') {
     }
 }
 
-  } // stages
+  stage('Upload Artifacts to Google Drive') {
+  steps {
+    echo "Uploading artifacts to Google Drive..."
+    sh '''
+      # Carpeta donde Jenkins guarda los reportes
+      ARTIFACTS_DIR=$PWD
 
+      # Remote de rclone configurado (gdrive) y carpeta en Drive
+      REMOTE="godrive:JenkinsReports/${BUILD_NUMBER}"
+
+      # Crear carpeta en Drive y subir todo
+      rclone mkdir "${REMOTE}" || true
+      rclone copy "${ARTIFACTS_DIR}/semgrep-results.json" "${REMOTE}/" -P || true
+      rclone copy "${ARTIFACTS_DIR}/dependency-check-reports/" "${REMOTE}/dependency-check-reports/" -P || true
+      rclone copy "${ARTIFACTS_DIR}/trivy-reports/" "${REMOTE}/trivy-reports/" -P || true
+      rclone copy "${ARTIFACTS_DIR}/zap-reports/" "${REMOTE}/zap-reports/" -P || true
+
+      echo "Artifacts uploaded to ${REMOTE}"
+    '''
+  }
+}
+
+} // stages
+  
   post {
     always {
       echo "Pipeline finished. Collecting artifacts..."
