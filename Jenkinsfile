@@ -55,7 +55,7 @@ stage('SCA - Dependency Check (OWASP dependency-check)') {
                 -v $PWD:/src \
                 -v $PWD/dependency-check-data:/usr/share/dependency-check/data \
                 -v $PWD/dependency-check-reports:/report \
-                owasp/dependency-check:latest \
+                owasp/dependency-check:12.1.6 \
                 dependency-check.sh \
                 --project devsecops-labs \
                 --scan /src \
@@ -66,6 +66,44 @@ stage('SCA - Dependency Check (OWASP dependency-check)') {
         archiveArtifacts artifacts: 'dependency-check-reports/**', allowEmptyArchive: false
     }
 }
+
+
+stage('PaC - Checkov on Dockerfile') {
+  steps {
+    echo "Running Policy as Code (Checkov)..."
+    sh '''
+      docker run --rm -v $PWD:/project -w /project bridgecrew/checkov \
+        -d /project --framework dockerfile --output json > checkov-report.json || true
+      docker run --rm -v $PWD:/project -w /project bridgecrew/checkov \
+        -d /project --framework dockerfile --output cli > checkov-cli-report.txt || true
+
+      echo "Checkov CLI Report:"
+      cat checkov-cli-report.txt
+    '''
+    archiveArtifacts artifacts: 'checkov-report.json,checkov-cli-report.txt', allowEmptyArchive: true
+  }
+}
+
+// funciona
+stage('PaC - Checkov Validation') {
+  steps {
+    echo "Validating Checkov report..."
+    sh '''
+        echo "Full Checkov summary:"
+        jq '.summary' checkov-report.json
+    
+      FAILED=$(jq '.summary.failed' checkov-report.json)
+      echo "Checkov failed checks: $FAILED"
+      if [ "$FAILED" -gt 0 ]; then
+        echo "Critical policy violations detected. Failing pipeline."
+        exit 1
+      else
+        echo "No critical policy violations."
+      fi
+    '''
+  }
+}
+
 stage('Docker Build & Trivy Scan') {
       steps {
         echo "Building Docker image..."
@@ -83,32 +121,60 @@ stage('Docker Build & Trivy Scan') {
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $(pwd)/trivy-cache:/root/.cache/ \
             -v $(pwd)/trivy-reports:/reports \
-            aquasec/trivy:latest image \
+            aquasec/trivy:0.67.0 image \
               --format json --output /reports/trivy-report.json ${DOCKER_IMAGE_NAME} || true
 
           # Fail on HIGH/CRITICAL vulnerabilities
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $(pwd)/trivy-cache:/root/.cache/ \
-            aquasec/trivy:latest image \
+            aquasec/trivy:0.67.0 image \
               --severity HIGH,CRITICAL ${DOCKER_IMAGE_NAME} || true
         '''
         archiveArtifacts artifacts: 'trivy-reports/**', allowEmptyArchive: true
       }
     }
+//funciona
+stage('PaC - Trivy Validation') {
+  steps {
+    echo "Validating Trivy report..."
+    sh '''
+      if ! command -v jq &> /dev/null; then
+        apt-get update && apt-get install -y jq
+      fi
 
-    stage('Deploy to Staging (docker-compose)') {
-    //   agent { label 'docker' }
+      # Contar vulnerabilidades CRÍTICAS y ALTAS
+      HIGH=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-reports/trivy-report.json)
+      CRITICAL=$(jq '[.Results[].Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-reports/trivy-report.json)
+
+      echo "HIGH vulnerabilities: $HIGH"
+      echo "CRITICAL vulnerabilities: $CRITICAL"
+
+      TOTAL=$((HIGH + CRITICAL))
+
+      if [ "$TOTAL" -gt 0 ]; then
+        echo "Security issues detected! Failing pipeline."
+        exit 1
+      else
+        echo "No HIGH/CRITICAL vulnerabilities found."
+      fi
+    '''
+  }
+}   
+    
+    
+
+   stage('Deploy to Staging (docker-compose)') {
       steps {
         echo "Deploying to staging with docker-compose..."
         sh '''
-          docker-compose -f docker-compose.yml down || true
-          docker-compose -f docker-compose.yml up -d --build
+          docker compose -f docker-compose.yml down || true
+          docker compose -f docker-compose.yml up -d --build
           sleep 8
           docker ps -a
         '''
       }
-    }
+  }
 
 stage('DAST - OWASP ZAP scan') {
     steps {
