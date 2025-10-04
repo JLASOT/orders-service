@@ -242,7 +242,6 @@ pipeline {
       }
     }
 
-//funciona
     stage('PaC - Trivy Validation') {
       steps {
         echo "Validating Trivy report..."
