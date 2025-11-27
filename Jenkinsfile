@@ -410,6 +410,4 @@ post {
                   message: "❌ Pipeline *${env.JOB_NAME}* #${env.BUILD_NUMBER} failed!\nCheck Jenkins logs: ${env.BUILD_URL}"
     }
 }
-
-
 }
